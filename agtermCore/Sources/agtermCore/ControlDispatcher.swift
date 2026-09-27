@@ -61,6 +61,8 @@ public protocol ControlActions {
     /// Take the lead of a pane's zmx daemon for this Mac, as a key press on the pane's cover does. The
     /// default below keeps existing hosts source-compatible.
     func takeSessionLead(_ target: String?, window: String?, pane: StatusPane?) -> ControlResponse
+    /// Reconnect a pane attached from another Mac; the default below keeps existing hosts source-compatible.
+    func reconnectSessionPane(_ target: String?, window: String?, pane: StatusPane?) -> ControlResponse
     func scratchSession(_ target: String?, window: String?, mode: String?, command: String?) -> ControlResponse
     func focusSessionPane(_ target: String?, window: String?, pane: String?) -> ControlResponse
     func resizeSplit(_ target: String?, window: String?, resize: ControlSplitResize) -> ControlResponse
@@ -221,7 +223,7 @@ public struct ControlDispatcher {
             return await dispatchSessionCommand(request)
         case .sessionRestart:
             return await dispatchSessionRestart(request)
-        case .sessionSplit, .sessionSplitClose, .sessionSwap, .sessionLead, .sessionScratch, .sessionFocus,
+        case .sessionSplit, .sessionSplitClose, .sessionSwap, .sessionLead, .sessionReconnect, .sessionScratch, .sessionFocus,
                 .sessionResize, .surfaceZoom, .surfaceCursor, .sessionType,
                 .sessionCopy, .sessionPaste, .sessionSelectAll, .sessionSearch, .sessionOverlayOpen,
                 .sessionOverlayClose, .sessionOverlayResize, .sessionOverlayReload, .sessionOverlayNavigate,
@@ -626,11 +628,8 @@ public struct ControlDispatcher {
             return actions.closeSessionSplit(request.target, window: request.args?.window)
         case .sessionSwap:
             return await actions.swapSessionPanes(request.target, window: request.args?.window)
-        case .sessionLead:
-            switch parseSurfacePane(request.args?.pane) {
-            case .pane(let pane): return actions.takeSessionLead(request.target, window: request.args?.window, pane: pane)
-            case .rejected(let rejection): return rejection
-            }
+        case .sessionLead, .sessionReconnect:
+            return dispatchPaneLink(request)
         case .sessionScratch:
             return actions.scratchSession(request.target, window: request.args?.window, mode: request.args?.mode,
                                           command: request.args?.command)

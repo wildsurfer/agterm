@@ -696,6 +696,29 @@ struct ControlDispatcherTests {
         #expect(actions.calls.isEmpty)
     }
 
+    @Test func sessionReconnectParsesThePaneOnceAndRoutesIt() async {
+        let actions = MockControlActions()
+
+        let response = await ControlDispatcher(actions: actions).dispatch(ControlRequest(
+            cmd: .sessionReconnect, target: "session", args: ControlArgs(window: "win", pane: "split")))
+        let bare = await ControlDispatcher(actions: actions).dispatch(ControlRequest(cmd: .sessionReconnect, target: "active"))
+
+        #expect(response?.ok == true)
+        #expect(bare?.ok == true)
+        #expect(actions.calls == [.sessionReconnect(target: "session", window: "win", pane: .right),
+                                  .sessionReconnect(target: "active", window: nil, pane: nil)])
+    }
+
+    @Test func sessionReconnectRejectsAnUnknownPaneBeforeDispatch() async {
+        let actions = MockControlActions()
+
+        let response = await ControlDispatcher(actions: actions).dispatch(ControlRequest(
+            cmd: .sessionReconnect, target: "session", args: ControlArgs(pane: "middle")))
+
+        #expect(response == ControlResponse(ok: false, error: "invalid pane: middle"))
+        #expect(actions.calls.isEmpty)
+    }
+
     @Test func splitRejectsAnUnknownAxisBeforeDispatch() async {
         let actions = MockControlActions()
         let response = await ControlDispatcher(actions: actions).dispatch(ControlRequest(

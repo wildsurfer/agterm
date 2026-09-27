@@ -2929,6 +2929,10 @@ for (const ws of tree.workspaces) for (const s of ws.sessions) {
               <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">ServerAliveInterval</span> for the connection, or sets it to 0, agterm adds ssh keepalive options (<span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">ServerAliveInterval</span> 5,
               <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">ServerAliveCountMax</span> 2), so a dead connection is noticed within about fifteen seconds; a large value is the way to opt out.
               When the pane's ssh joins an existing <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">ControlMaster</span> connection the options do nothing, and that master's own settings decide.
+              <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">agtermctl session reconnect</span> retries
+              a waiting pane now, or attaches a frozen one again; each pane's
+              <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">connection</span> in
+              <span style="font-family: &quot;JetBrains Mono&quot;, monospace; color: #cbc6bc">tree</span> says which state it is in.
             </p>
 
             <div

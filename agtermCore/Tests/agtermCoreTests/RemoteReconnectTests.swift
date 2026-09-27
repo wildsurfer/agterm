@@ -189,3 +189,57 @@ struct RemoteReconnectBookTests {
         #expect(book.finished(pane: pane, ok: true, now: t0)?.host == "mini")
     }
 }
+
+@MainActor
+struct ControlRemoteConnectionTests {
+    let t0 = Date(timeIntervalSince1970: 1_000)
+
+    private func entry(probing: Bool) -> RemoteReconnectBook.Entry {
+        let book = RemoteReconnectBook()
+        let pane = UUID()
+        book.wait(pane: pane, session: UUID(), host: "mini", cover: false, now: t0)
+        _ = book.due(now: t0)
+        if !probing { _ = book.finished(pane: pane, ok: false, now: t0) }
+        return book.entries[pane]!
+    }
+
+    @Test func aWaitingPaneReportsTheSecondsToItsNextProbe() {
+        let connection = ControlRemoteConnection(entry: entry(probing: false), lastAnswer: t0, streamUp: true,
+                                                 now: t0.addingTimeInterval(0.4))
+        #expect(connection == ControlRemoteConnection(state: .reconnecting, silence: nil, retryIn: 1))
+    }
+
+    @Test func aProbeInFlightReadsZeroSecondsNeverNegative() {
+        let connection = ControlRemoteConnection(entry: entry(probing: true), lastAnswer: t0, streamUp: true,
+                                                 now: t0.addingTimeInterval(9))
+        #expect(connection.retryIn == 0)
+    }
+
+    @Test func silenceBeyondOneAndAHalfPingsIsStale() {
+        let quiet = ControlRemoteConnection(entry: nil, lastAnswer: t0, streamUp: true, now: t0.addingTimeInterval(16.4))
+        #expect(quiet == ControlRemoteConnection(state: .stale, silence: 16, retryIn: nil))
+        #expect(ControlRemoteConnection(entry: nil, lastAnswer: t0, streamUp: true, now: t0.addingTimeInterval(15)).state == .connected)
+    }
+
+    @Test func silenceWithNoStreamUpSaysNothingAboutThePane() {
+        let down = ControlRemoteConnection(entry: nil, lastAnswer: t0, streamUp: false, now: t0.addingTimeInterval(600))
+        #expect(down.state == .connected)
+    }
+
+    @Test func treeSurfaceNodeEncodesConnectionAndOmitsItWhenNil() throws {
+        let waiting = ControlSurfaceNode(id: "surface:s1:left", kind: "left", active: true, visible: true, backedByZmx: false,
+                                         connection: ControlRemoteConnection(state: .reconnecting, silence: nil, retryIn: 1))
+        let object = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(waiting)) as? [String: Any]
+        let connection = object?["connection"] as? [String: Any]
+        #expect(connection?["state"] as? String == "reconnecting")
+        #expect(connection?["retryIn"] as? Int == 1)
+        #expect(connection?["silence"] == nil, "omitted, not null")
+        let plain = String(decoding: try JSONEncoder().encode(
+            ControlSurfaceNode(id: "surface:s1:left", kind: "left", active: true, visible: true, backedByZmx: false)), as: UTF8.self)
+        #expect(!plain.contains("connection"))
+    }
+
+    @Test func anOriginThatNeverAnsweredReadsConnected() {
+        #expect(ControlRemoteConnection(entry: nil, lastAnswer: nil, streamUp: true, now: t0).state == .connected)
+    }
+}

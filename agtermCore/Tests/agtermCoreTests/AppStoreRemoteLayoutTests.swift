@@ -143,4 +143,67 @@ struct AppStoreRemoteLayoutTests {
 
         #expect(!store.remotePaneIsHeld(session.paneIdentity, forSession: session.id))
     }
+
+    @Test func remotePanesReportTheirConnectionAndLocalPanesDoNot() throws {
+        let (store, session) = try attached()
+        let workspaceID = try #require(store.currentWorkspaceID)
+        let local = try #require(store.addSession(toWorkspace: workspaceID, cwd: "/tmp"))
+        local.surface = SpySurface()
+
+        let sessions = store.controlTree().workspaces.flatMap(\.sessions)
+        let remote = sessions.first { $0.id == session.id.uuidString }?.surfaces ?? []
+        let plain = sessions.first { $0.id == local.id.uuidString }?.surfaces ?? []
+
+        #expect(remote.filter { $0.kind == "left" || $0.kind == "right" }.map { $0.connection?.state } == [.connected, .connected])
+        #expect(plain.allSatisfy { $0.connection == nil })
+    }
+
+    @Test func aLocalSplitInARemoteSessionHasNoConnection() throws {
+        let (store, session) = try attached()
+        store.closeSplit(session.id)
+        store.toggleSplit(session.id)
+        session.splitSurface = SpySurface()
+
+        let node = store.controlTree().workspaces.flatMap(\.sessions).first { $0.id == session.id.uuidString }
+        let surfaces = try #require(node?.surfaces)
+
+        #expect(surfaces.first { $0.kind == "left" }?.connection?.state == .connected)
+        #expect(surfaces.first { $0.kind == "right" }.map { $0.connection == nil } == true)
+    }
+
+    @Test func aReplicaHeldOnItsExitLineHasNoConnectionUntilItWaits() throws {
+        let (store, session) = try attached()
+        defer { RemoteReconnectBook.shared.cancel(pane: session.paneIdentity) }
+        func left() -> ControlRemoteConnection? {
+            store.controlTree().workspaces.flatMap(\.sessions).first { $0.id == session.id.uuidString }?
+                .surfaces?.first { $0.kind == "left" }?.connection
+        }
+
+        store.remotePaneHeld(session.paneIdentity, forSession: session.id)
+        #expect(left() == nil, "an attach that ended is no link to describe")
+
+        RemoteReconnectBook.shared.wait(pane: session.paneIdentity, session: session.id, host: "mini", cover: false,
+                                        now: Date())
+        #expect(left()?.state == .reconnecting)
+    }
+
+    @Test func aResumedReplicaSchedulesATreeChange() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var events: [ControlEventKind] = []
+        let store = AppStore(persistence: PersistenceStore(directory: directory),
+                             controlEventSink: { events.append($0.kind) }, paneFinalizer: nil)
+        let workspace = store.addWorkspace(name: "work")
+        let session = try #require(store.addSession(toWorkspace: workspace.id, cwd: "/tmp", remoteHost: "origin"))
+        session.surface = SpySurface()
+        store.bindRemote(RemoteBinding(remoteSessionID: "origin", daemonsByLocalPane: [
+            session.paneIdentity: ZmxSupport.daemonName(for: originA),
+        ], presentationVersion: 1), forSession: session.id)
+        store.remotePaneHeld(session.paneIdentity, forSession: session.id)
+        events.removeAll()
+
+        store.remotePaneResumed(session.paneIdentity, forSession: session.id)
+
+        #expect(events == [.treeChanged])
+    }
 }

@@ -132,6 +132,21 @@ final class ControlServerRemoteReconnectTests: XCTestCase {
                        "an origin that never reports a role would leave it covered for good")
     }
 
+    func testScriptedInputIntoAWaitingPaneIsRefused() async throws {
+        let (session, view) = try replica()
+        let server = server(probe: 255)
+        let id = session.id.uuidString
+        server.waitToReconnect(view, cover: false)
+
+        let typed = await server.injectText("ls\n", into: session.id, store: store, select: false, pane: nil)
+        XCTAssertEqual(typed.error, "pane is reconnecting")
+        XCTAssertEqual(server.pasteSession(id, window: nil, pane: nil).error, "pane is reconnecting")
+        XCTAssertNotEqual(server.selectAllSession(id, window: nil).error, "pane is reconnecting", "the kept screen can be selected")
+
+        RemoteReconnectBook.shared.cancel(pane: session.paneIdentity)
+        XCTAssertNotEqual(server.pasteSession(id, window: nil, pane: nil).error, "pane is reconnecting")
+    }
+
     func testAnAttachThatDidNotStartKeepsThePaneWaitingAndHeld() async throws {
         let (session, view) = try replica()
         let server = server(probe: 0)
@@ -250,5 +265,95 @@ final class ControlServerRemoteReconnectTests: XCTestCase {
         server.waitToReconnect(view, cover: false)
 
         XCTAssertFalse(RemoteReconnectBook.shared.waiting(pane: session.paneIdentity))
+    }
+
+    func testReconnectForcesAFreshAttachOfALivePane() async throws {
+        let (session, view) = try replica()
+        let server = server(probe: 0)
+        let reconnected = expectation(description: "reconnected")
+        PaneLead.reconnect = { old, _ in
+            XCTAssertTrue(old === view)
+            reconnected.fulfill()
+            return true
+        }
+
+        let response = server.reconnectSessionPane(session.id.uuidString, window: nil, pane: nil)
+
+        XCTAssertTrue(response.ok)
+        await fulfillment(of: [reconnected], timeout: 2)
+    }
+
+    func testReconnectOnAWaitingPaneOnlyRetries() async throws {
+        let (session, view) = try replica()
+        let probe = Probe(status: 255)
+        let server = server(runner: probe)
+        let frozen = Date()
+        server.hudClock = { frozen }
+        server.waitToReconnect(view, cover: false)
+        server.tickReconnects()
+        for _ in 0..<200 where probe.argvs.count < 1 { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<200 where RemoteReconnectBook.shared.entries[session.paneIdentity]?.probing != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertTrue(server.reconnectSessionPane(session.id.uuidString, window: nil, pane: nil).ok)
+        for _ in 0..<200 where probe.argvs.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<200 where RemoteReconnectBook.shared.entries[session.paneIdentity]?.probing != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(probe.argvs.count, 2)
+        XCTAssertEqual(RemoteReconnectBook.shared.entries[session.paneIdentity]?.failures, 1, "a forced retry starts the backoff over")
+    }
+
+    func testForcingAPaneThatJustReconnectedProbesAtOnce() async throws {
+        let (session, view) = try replica()
+        let probe = Probe(status: 0)
+        let server = server(runner: probe)
+        let frozen = Date()
+        server.hudClock = { frozen }
+        PaneLead.reconnect = { _, _ in true }
+
+        server.waitToReconnect(view, cover: false)
+        server.tickReconnects()
+        for _ in 0..<200 where probe.argvs.count < 1 { try await Task.sleep(for: .milliseconds(10)) }
+        for _ in 0..<200 where RemoteReconnectBook.shared.waiting(pane: session.paneIdentity) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertTrue(server.reconnectSessionPane(session.id.uuidString, window: nil, pane: nil).ok)
+        for _ in 0..<100 where probe.argvs.count < 2 { try await Task.sleep(for: .milliseconds(10)) }
+
+        XCTAssertEqual(probe.argvs.count, 2)
+    }
+
+    func testReconnectRefusesALocalPaneAndAMissingSplit() throws {
+        let (session, _) = try replica()
+        let workspace = try XCTUnwrap(store.currentWorkspaceID)
+        let local = try XCTUnwrap(store.addSession(toWorkspace: workspace, cwd: "/tmp"))
+        let server = server(probe: 0)
+
+        XCTAssertEqual(server.reconnectSessionPane(local.id.uuidString, window: nil, pane: nil).error,
+                       "pane is not attached from another Mac")
+        XCTAssertEqual(server.reconnectSessionPane(session.id.uuidString, window: nil, pane: .right).error,
+                       "session has no split pane")
+    }
+
+    func testReconnectRefusesALocalSplitOfARemoteSession() throws {
+        let (session, _) = try replica()
+        store.toggleSplit(session.id)
+        let split = try XCTUnwrap(session.splitPaneIdentity)
+        let view = GhosttySurfaceView(workingDirectory: NSTemporaryDirectory(),
+                                      env: ["AGTERM_PANE_ID": split.uuidString], backedByZmx: false)
+        view.session = session
+        session.splitSurface = view
+        PaneLead.reconnect = { _, _ in
+            XCTFail("a local split is never attached")
+            return true
+        }
+
+        XCTAssertEqual(server(probe: 0).reconnectSessionPane(session.id.uuidString, window: nil, pane: .right).error,
+                       "pane is not attached from another Mac")
+        XCTAssertFalse(RemoteReconnectBook.shared.waiting(pane: split))
     }
 }

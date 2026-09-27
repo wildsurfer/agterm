@@ -37,4 +37,15 @@ extension ControlDispatcher {
     func parseOverlayPane(_ raw: String?) -> PaneSelection<OverlayPane> {
         parsePane(raw, error: PaneOverlayError.invalidPane) { OverlayPane(controlName: $0) }
     }
+
+    /// `session.lead` and `session.reconnect`: one surface pane selector, two actions.
+    func dispatchPaneLink(_ request: ControlRequest) -> ControlResponse {
+        switch parseSurfacePane(request.args?.pane) {
+        case .rejected(let rejection): return rejection
+        case .pane(let pane):
+            return request.cmd == .sessionLead
+                ? actions.takeSessionLead(request.target, window: request.args?.window, pane: pane)
+                : actions.reconnectSessionPane(request.target, window: request.args?.window, pane: pane)
+        }
+    }
 }

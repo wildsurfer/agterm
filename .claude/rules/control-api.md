@@ -155,7 +155,7 @@ renumbering. Do not reintroduce a count anywhere.
 - `tree`, `events.read`
 - `workspace.new`, `.rename`, `.delete`, `.select`, `.go`, `.move`, `.focus`, `.filter`, `.collapse`, `.expand`
 - `session.new`, `.duplicate`, `.close`, `.select`, `.rename`, `.reveal`, `.move`, `.type`, `.split`,
-  `.split.close`, `.swap`, `.lead`,
+  `.split.close`, `.swap`, `.lead`, `.reconnect`,
   `.scratch`, `.focus`, `.resize`, `.go`, `.copy`, `.paste`, `.selectall`, `.text`, `.search`, `.status`,
   `.flag`, `.seen`, `.restore`, `.restart`, `.background`, `.overlay.open`, `.overlay.close`, `.overlay.resize`,
   `.overlay.reload`, `.overlay.navigate`,
@@ -1416,6 +1416,16 @@ side, and reads `lastAppliedIsDark` when bare. Refuse it outside XCUITest; provi
   every waiting pane and dropped stream due now and starts their backoff over, so a probe fired before the
   network is back ramps from 1 s again instead of waiting out the 300 s cap. A key on a waiting pane goes
   through the same `retryNow` and starts the backoff over too.
+  `session.reconnect` is the key's control twin: it retries a waiting pane, or parks a live one through
+  `remotePaneStopped` + `waitToReconnect` so the probe loop attaches it afresh. `session.type` and
+  `session.paste` into a waiting pane refuse with `pane is reconnecting`, as a covered pane refuses: the
+  wrapper's `cat` drops the text. Reads and `session.selectall` stay available, the kept screen being the point.
+  Read back `connection` on the primary/split surface node (`ControlRemoteConnection`): `stale` counts
+  silence on `RemotePresentationState.lastAnswer` only while the stream is `connected`, past
+  `ControlRemoteConnection.staleAfter` (one and a half origin pings, `RemotePresentationClient.pingInterval`,
+  which the origin's heartbeat loop also reads), and is poll-only. A pane held on its exit line omits the
+  field, its attach having ended; a waiting pane reads `reconnecting` with `retryIn` whatever its hold,
+  while its streak and reason stay on `reconnect`.
   The held exit reaches the app at once through `onExitHeld`, which forgets the pane's lead and records the
   hold for remote layout, but it carries no ssh status: `/usr/bin/login` discards it. Each pane holding and
   closing on its own is also right when one half of a split dies.

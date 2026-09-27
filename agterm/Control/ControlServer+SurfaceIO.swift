@@ -37,6 +37,7 @@ extension ControlServer {
                 return ControlResponse(ok: false, error: "session not realized")
             }
             if let refusal = self.coveredRefusal(surface) { return refusal }
+            if action == "paste_from_clipboard", let refusal = self.reconnectingRefusal(surface) { return refusal }
             surface.expediteSpawn()
             // the cast alone only proves the SLOT is filled; a false return is the view without a surface.
             guard surface.performBindingAction(action) else {
@@ -574,8 +575,9 @@ extension ControlServer {
         // its own surface, whose keystrokes the daemon drops
         let session = store.session(withID: id)
         let slot = pane == .right ? session?.splitSurface : (pane == .scratch ? nil : session?.surface)
-        if let surface = slot as? GhosttySurfaceView, let covered = coveredType(text, into: surface, session: id) {
-            return covered
+        if let surface = slot as? GhosttySurfaceView,
+           let refused = reconnectingRefusal(surface) ?? coveredType(text, into: surface, session: id) {
+            return refused
         }
         switch pane {
         case nil, .left:

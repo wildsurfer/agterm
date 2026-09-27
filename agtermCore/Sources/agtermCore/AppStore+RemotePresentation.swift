@@ -159,6 +159,11 @@ extension AppStore {
         session(withID: id)?.remotePresentation?.mode = mode
     }
 
+    /// When the last accepted frame arrived, for the stale check.
+    public func noteRemoteAnswer(_ date: Date, forSession id: UUID) {
+        session(withID: id)?.remotePresentation?.lastAnswer = date
+    }
+
     /// Marks the live HUD as the bridge's. Called once the app has the mirrored panel up.
     public func markHudBridged(forSession id: UUID) {
         guard let session = session(withID: id), session.hudActive else { return }
@@ -208,5 +213,18 @@ extension AppStore {
         guard let pane else { return (nil, true) }
         guard let role = localPane(pane, in: session) else { return (nil, false) }
         return (role == .right ? .right : .left, true)
+    }
+
+    /// The tree's `connection` for a daemon-bound pane: nil for a local pane, a local split of a remote
+    /// session, and a pane held on its exit line, whose attach ended; one waiting to reconnect reads so
+    /// whatever its hold.
+    func remoteConnection(_ session: Session, surface: TerminalZoomSurface,
+                          now: Date = Date()) -> ControlRemoteConnection? {
+        guard surface == .primary || surface == .split, let pane = session.paneIdentity(for: surface),
+              session.remotePresentation?.binding.daemon(forLocalPane: pane) != nil else { return nil }
+        let waiting = RemoteReconnectBook.shared.entries[pane]
+        guard waiting != nil || !remotePaneIsHeld(pane, forSession: session.id) else { return nil }
+        return ControlRemoteConnection(entry: waiting, lastAnswer: session.remotePresentation?.lastAnswer,
+                                       streamUp: session.remotePresentation?.connection == .connected, now: now)
     }
 }

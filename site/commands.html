@@ -468,7 +468,15 @@
                 window size is the one the pane's program sees. A pane that does not lead is covered. A remote pane waiting to be attached again after its ssh dropped also carries
                 <span style="font-family: &quot;JetBrains Mono&quot;, monospace">reconnect</span>, with <span style="font-family: &quot;JetBrains Mono&quot;, monospace">failures</span> (the retry streak) and, when ssh said anything on the last failed try, its <span style="font-family: &quot;JetBrains Mono&quot;, monospace">reason</span>.
                 <span style="font-family: &quot;JetBrains Mono&quot;, monospace">lead</span> is absent until the
-                pane's terminal reports one),
+                pane's terminal reports one), and its
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">connection</span>: a remote pane's link,
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">connected</span>, <span style="font-family: &quot;JetBrains Mono&quot;, monospace">stale</span> or
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">reconnecting</span>. <span style="font-family: &quot;JetBrains Mono&quot;, monospace">stale</span> means no
+                presentation frame for over 15s while the stream is up and ssh still holds, with <span style="font-family: &quot;JetBrains Mono&quot;, monospace">silence</span> giving the seconds;
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">reconnecting</span> means the pane waits for its host, with
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">retryIn</span> the seconds to the next probe, 0 while probing. <span style="font-family: &quot;JetBrains Mono&quot;, monospace">stale</span> is poll-only; entering or leaving
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">reconnecting</span> emits <span style="font-family: &quot;JetBrains Mono&quot;, monospace">tree.changed</span>. Omitted for a local
+                pane and for scratch or overlay surfaces,
                 <span style="font-family: &quot;JetBrains Mono&quot;, monospace">liveAttribution</span> and
                 <span style="font-family: &quot;JetBrains Mono&quot;, monospace">splitLiveAttribution</span> (primary and split pane
                 attribution: <span style="font-family: &quot;JetBrains Mono&quot;, monospace">supervisor</span> identifies the bundled
@@ -1397,6 +1405,28 @@
               <p style="font-size: 13.5px; line-height: 1.6; color: #949ba4; margin: 8px 0 0">
                 A pane that already leads answers ok. One whose terminal reports no lead answers <span style="font-family: &quot;JetBrains Mono&quot;, monospace">pane has no lead to take</span>. Read each pane's
                 <span style="font-family: &quot;JetBrains Mono&quot;, monospace">lead</span> from <span style="font-family: &quot;JetBrains Mono&quot;, monospace">tree</span>.
+              </p>
+            </div>
+
+            <div style="background: #22272b; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 11px; padding: 18px 20px; margin-bottom: 12px">
+              <div style="font-family: &quot;JetBrains Mono&quot;, monospace; font-size: 13.5px; color: #6d82f3; line-height: 1.6; word-break: break-word">
+                agtermctl session reconnect [--pane left|right] [--target T] [--window W]
+              </div>
+              <div style="font-family: &quot;JetBrains Mono&quot;, monospace; font-size: 11.5px; color: #6b727a; margin-top: 6px">session.reconnect</div>
+              <p style="font-size: 15px; line-height: 1.65; color: #cbc6bc; margin: 10px 0 0">
+                Reconnect a pane attached from another Mac. A pane waiting to reconnect retries now, as a key on it does. A
+                live pane, whose link may have frozen before ssh noticed it, is parked and attached again from scratch: the
+                program on the other Mac keeps running, and the pane never takes the lead from another Mac.
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">--pane</span> defaults to the primary pane. Returns
+                the session id. While a pane waits to reconnect, <span style="font-family: &quot;JetBrains Mono&quot;, monospace">session type</span>
+                and <span style="font-family: &quot;JetBrains Mono&quot;, monospace">session paste</span> into it answer
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">pane is reconnecting</span>; reads still work.
+              </p>
+              <p style="font-size: 13.5px; line-height: 1.6; color: #949ba4; margin: 8px 0 0">
+                A local pane or scratch answers <span style="font-family: &quot;JetBrains Mono&quot;, monospace">pane is not attached
+                from another Mac</span>; a missing split answers
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">session has no split pane</span>. Read each pane's
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace">connection</span> from <span style="font-family: &quot;JetBrains Mono&quot;, monospace">tree</span>.
               </p>
             </div>
 

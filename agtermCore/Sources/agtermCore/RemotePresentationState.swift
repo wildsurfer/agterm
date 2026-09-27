@@ -76,6 +76,9 @@ public struct RemotePresentationState: Equatable, Sendable {
     public let binding: RemoteBinding
     public var connection: RemotePresentationConnection
     public var mode: PresentationMode = .mirror
+    /// When the origin last sent an accepted frame. Nil until the first one, so a fresh attach reads
+    /// `connected` rather than stale.
+    public internal(set) var lastAnswer: Date?
     var layout: PresentationLayout?
     var heldPanes: Set<UUID> = []
     /// Whether the glyph on the row is the bridge's. A flag and not a comparison of values: a pane swap

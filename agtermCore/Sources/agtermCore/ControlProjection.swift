@@ -2,6 +2,8 @@
 // request envelope in `ControlProtocol.swift` and the response envelope in `ControlResponse.swift`.
 // Split out for the file size limit.
 
+import Foundation
+
 /// A terminal surface as projected into the `tree` response. `id` is the stable control address for
 /// `surface.zoom`; `kind` the user-facing name (`left`, `right`, `scratch`, `overlay`). `active`/`visible`
 /// derive from the session's own flags (overlay/scratch/splitFocused), NOT from terminal zoom, and `visible`
@@ -23,13 +25,16 @@ public struct ControlSurfaceNode: Codable, Sendable, Equatable {
     public let reconnect: ControlReconnect?
     /// paneID is the token `--pane-id` resolves, omitted for a slot whose surface carries none.
     public let paneID: String?
+    /// A remote pane's link: `connected`, `stale` or `reconnecting`. Nil for a local pane.
+    public let connection: ControlRemoteConnection?
 
     public init(id: String, kind: String, active: Bool, visible: Bool) {
         self.init(id: id, kind: kind, active: active, visible: visible, backedByZmx: nil)
     }
 
     public init(id: String, kind: String, active: Bool, visible: Bool, backedByZmx: Bool?,
-                lead: ZmxLeadRole? = nil, reconnect: ControlReconnect? = nil, paneID: String? = nil) {
+                lead: ZmxLeadRole? = nil, reconnect: ControlReconnect? = nil, paneID: String? = nil,
+                connection: ControlRemoteConnection? = nil) {
         self.id = id
         self.kind = kind
         self.active = active
@@ -38,6 +43,7 @@ public struct ControlSurfaceNode: Codable, Sendable, Equatable {
         self.lead = lead
         self.reconnect = reconnect
         self.paneID = paneID
+        self.connection = connection
     }
 }
 
@@ -51,6 +57,40 @@ public struct ControlReconnect: Codable, Sendable, Equatable {
     public init(failures: Int, reason: String?) {
         self.failures = failures
         self.reason = reason
+    }
+}
+
+/// One remote pane's link as `tree` reads it. `stale` means the origin has sent no presentation frame for
+/// longer than `staleAfter` while ssh still holds; `reconnecting` means the pane waits for its host.
+public struct ControlRemoteConnection: Codable, Sendable, Equatable {
+    public enum State: String, Codable, Sendable {
+        case connected, stale, reconnecting
+    }
+
+    /// One missed origin ping and half the next: a pane is what the user looks at, so it reads stale before
+    /// the stream itself gives up on three.
+    static let staleAfter: TimeInterval = RemotePresentationClient.pingInterval * 1.5
+
+    public let state: State
+    public let silence: Int?
+    public let retryIn: Int?
+
+    init(state: State, silence: Int?, retryIn: Int?) {
+        self.state = state
+        self.silence = silence
+        self.retryIn = retryIn
+    }
+
+    /// `streamUp` gates `stale`: with no stream, silence says nothing about the pane's own ssh.
+    init(entry: RemoteReconnectBook.Entry?, lastAnswer: Date?, streamUp: Bool, now: Date) {
+        if let entry {
+            let wait = entry.probing ? 0 : Int(entry.retryAt.timeIntervalSince(now).rounded(.up))
+            self.init(state: .reconnecting, silence: nil, retryIn: max(0, wait))
+        } else if streamUp, let lastAnswer, now.timeIntervalSince(lastAnswer) > Self.staleAfter {
+            self.init(state: .stale, silence: Int(now.timeIntervalSince(lastAnswer)), retryIn: nil)
+        } else {
+            self.init(state: .connected, silence: nil, retryIn: nil)
+        }
     }
 }
 

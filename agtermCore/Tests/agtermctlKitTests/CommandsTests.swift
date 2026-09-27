@@ -407,10 +407,11 @@ struct CommandsTests {
         #expect(try request(["session", "swap", "--target", "s1", "--window", "w1"]) == expected)
     }
 
-    @Test func sessionLeadCarriesThePaneAndDefaultsToTheActiveSession() throws {
-        let expected = ControlRequest(cmd: .sessionLead, target: "s1", args: ControlArgs(window: "w1", pane: "right"))
-        #expect(try request(["session", "lead", "--target", "s1", "--pane", "right", "--window", "w1"]) == expected)
-        #expect(try request(["session", "lead"]) == ControlRequest(cmd: .sessionLead, target: "active", args: ControlArgs()))
+    @Test(arguments: zip(["lead", "reconnect"], [Command.sessionLead, .sessionReconnect]))
+    func paneCommandsCarryThePaneAndDefaultToTheActiveSession(name: String, cmd: Command) throws {
+        let expected = ControlRequest(cmd: cmd, target: "s1", args: ControlArgs(window: "w1", pane: "right"))
+        #expect(try request(["session", name, "--target", "s1", "--pane", "right", "--window", "w1"]) == expected)
+        #expect(try request(["session", name]) == ControlRequest(cmd: cmd, target: "active", args: ControlArgs()))
     }
 
     @Test func sessionScratchDefaultsToggle() throws {

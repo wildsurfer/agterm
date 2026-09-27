@@ -84,6 +84,9 @@ extension ControlServer {
                 guard let self, let store = library.store(forSession: id) else { return }
                 agtermApp.applyRemoteLayout(layout, store: store, sessionID: id, library: library)
             },
+            answered: { [weak self] date in
+                self?.library.store(forSession: id)?.noteRemoteAnswer(date, forSession: id)
+            },
             warn: { reason in
                 remoteLogger.warning("presentation stream for \(id, privacy: .public): \(reason, privacy: .public)")
             })

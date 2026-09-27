@@ -40,7 +40,12 @@ enum PaneLead {
     static func linkLost(_ notice: RemoteLinkNotice, from view: GhosttySurfaceView) {
         guard !view.isDestroyed, let pane = UUID(uuidString: view.paneToken),
               ZmxLeadBook.shared.states[pane]?.attachment.nonce == notice.nonce else { return }
-        waitToReconnect?(view, ZmxLeadBook.shared.role(pane: pane) != nil || ZmxLeadBook.shared.reattaching(pane: pane))
+        waitToReconnect?(view, cover(pane: pane))
+    }
+
+    /// Whether a fresh attach of `pane` will report a role, so it may be covered until it does.
+    static func cover(pane: UUID) -> Bool {
+        ZmxLeadBook.shared.role(pane: pane) != nil || ZmxLeadBook.shared.reattaching(pane: pane)
     }
 
     /// True when `event` belongs to a takeover or a pane waiting to reconnect, and must not reach the terminal.

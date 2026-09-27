@@ -48,6 +48,7 @@ struct RemotePresentationClientTests {
         var overlayCloses: [PresentationOverlayChange] = []
         var overlayResizes: [PresentationOverlayChange] = []
         var warnings: [String] = []
+        var answers: [Date] = []
     }
 
     final class Clock { var now = Date(timeIntervalSince1970: 1_789_000_000) }
@@ -84,6 +85,7 @@ struct RemotePresentationClientTests {
             },
             overlayClose: { recorder.overlayCloses.append($0) },
             overlayResize: { recorder.overlayResizes.append($0) },
+            answered: { recorder.answers.append($0) },
             warn: { recorder.warnings.append($0) })
         return RemotePresentationClient(argv: ["ssh", "buildbox", "present"], presentationVersion: version,
                                         transport: transport, effects: effects, now: { clock.now })
@@ -110,6 +112,16 @@ struct RemotePresentationClientTests {
         #expect(hello.body == .hello(PresentationHello(version: PresentationCodec.version,
                                                        kinds: PresentationHub.supportedKinds, mode: .presenter)))
         #expect(recorder.connections == [.connecting])
+    }
+
+    @Test func everyAcceptedFrameReportsWhenTheOriginLastAnswered() {
+        let client = makeClient()
+        client.start()
+        clock.now += 5
+
+        connect(client)
+
+        #expect(recorder.answers == [clock.now, clock.now])
     }
 
     @Test func theSnapshotsContextIsAppliedThenEachChangeBehindIt() {

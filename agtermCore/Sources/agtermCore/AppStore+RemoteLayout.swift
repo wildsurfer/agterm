@@ -48,8 +48,9 @@ extension AppStore {
         session(withID: id)?.remotePresentation?.heldPanes.contains(local) == true
     }
 
-    /// The held replica attached again.
+    /// The held replica attached again; its `connection` read-back leaves `reconnecting`.
     public func remotePaneResumed(_ local: UUID, forSession id: UUID) {
         session(withID: id)?.remotePresentation?.heldPanes.remove(local)
+        scheduleTreeChanged()
     }
 }

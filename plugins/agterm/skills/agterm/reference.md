@@ -241,7 +241,7 @@ the read side of `font --pane`; each omitted when that pane isn't realized. `fon
 default/left target (the main pane, or the promoted split survivor once the primary exits — the same pane
 `font --pane left` writes); only the main pane's size survives a relaunch, so the split/scratch sizes and a
 promoted survivor are live-only — read them back here rather than from the snapshot), and `surfaces` (array
-of `{id, kind, active, visible, backedByZmx?, lead?, reconnect?, paneID?}` where `kind` is
+of `{id, kind, active, visible, backedByZmx?, lead?, reconnect?, paneID?, connection?}` where `kind` is
 `left`|`right`|`scratch`|`overlay`|`overlay-left`|`overlay-right`).
 Primary/split surfaces report `backedByZmx`; scratch and overlays omit it. `paneID` is the surface's
 stable token, the value `--pane-id` takes; it follows the terminal through a swap and is omitted for an
@@ -254,6 +254,11 @@ that dropped again soon after attaching, started over by a key on the pane, a wa
 and `reason` is what ssh said on the last failed probe, omitted
 when it said nothing. Its message can help distinguish an offline host from a refused login. It goes
 when the pane is attached again or closed.
+`connection` is a remote pane's link: `connected`, `stale` (the stream is up but no frame came for over
+15s while ssh still holds, `silence` gives the seconds), or `reconnecting` (`retryIn` gives seconds to the
+next probe, 0 while probing; the streak and reason are on `reconnect`). `stale` is poll-only; entering/leaving
+`reconnecting` emits `tree.changed`. Omitted for a local pane, for scratch/overlay surfaces, and for a pane
+whose attach ended on its exit line.
 The surface `id` is the address for `surface zoom`; hidden-but-alive split/scratch surfaces are included
 so a script can zoom them without changing split/scratch visibility first. Caveat: `active`/`visible`
 derive from the session's own flags, not from zoom — and `visible` reads false for a pane behind a
@@ -605,6 +610,12 @@ error keeps those names for compatibility.
 - `session lead [--pane left|right] [--target] [--window W]`: take the lead of a pane for this Mac, as a
   key press on its cover does; the pane is then covered on the other Mac. Ok when it already leads,
   `pane has no lead to take` when its terminal reports none. Read back `surfaces[].lead`.
+- `session reconnect [--pane left|right] [--target] [--window W]`: reconnect a
+  pane attached from another Mac. A pane waiting to reconnect retries now, as a key on it does; a live pane,
+  its link possibly frozen before ssh noticed, is parked and attached again from scratch — its program on
+  the other Mac keeps running. `pane is not attached from another Mac` or `session has no split pane` on
+  refusal. Returns the session id; read back `surfaces[].connection`. While a pane waits to reconnect,
+  `session type` and `session paste` into it refuse with `pane is reconnecting`; reads still work.
 - `session scratch [on|off|toggle] [--command CMD] [--target] [--window W]` — a third, full-coverage
   shell that renders like a full overlay but behaves like the split. `off` hides it keep-alive; typing
   `exit` in it closes it and the next `on` spawns a fresh shell. `on` selects the target first (the

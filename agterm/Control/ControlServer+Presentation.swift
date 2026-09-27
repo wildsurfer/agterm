@@ -84,7 +84,7 @@ extension ControlServer {
     static let presentationLimits = ControlStreamOwner.Limits(maxLineBytes: PresentationCodec.maxFrameBytes,
                                                               maxPendingLines: PresentationCodec.maxPendingFrames,
                                                               writeTimeoutSeconds: 5)
-    static let presentationHeartbeatSeconds: UInt64 = 10
+    static let presentationHeartbeatSeconds = UInt64(RemotePresentationClient.pingInterval)
     /// Lines a viewer may have waiting for the main actor. The reader thread stops reading past this, so a
     /// fast or faulty peer backs up into its own socket instead of into this app's memory.
     static let presentationInboundLimit = 64

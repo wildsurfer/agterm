@@ -384,6 +384,8 @@ omitted when expanded).
   a shell holds the pane or the program cannot be read. Use it to start a program over in its pane instead
   of typing into it; the reply carries the old and new shell pids, and `restart.replayedArgv` on a replay.
   Live sessions mode only.
+- `session reconnect [--pane left|right]`: reconnect a pane attached from another Mac — retries now if it's
+  waiting, or parks and reattaches it from scratch if its link froze. Read `tree`'s `surfaces[].connection`.
 - `session swap`: exchange the two terminals' physical positions and primary/split roles without restarting
   them. Focus follows the terminal; axis and divider ratio stay fixed. Works on shown or hidden splits and
   under zoom/dashboard; errors when there is no split or either surface is not ready. Read the new primary

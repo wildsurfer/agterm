@@ -131,6 +131,10 @@ public extension ControlActions {
         ControlResponse(ok: false, error: "session.lead is not supported by this host")
     }
 
+    func reconnectSessionPane(_: String?, window _: String?, pane _: StatusPane?) -> ControlResponse {
+        ControlResponse(ok: false, error: "session.reconnect is not supported by this host")
+    }
+
     /// Not `ControlActionsUnsupported.message`, which says "on this platform": the divider exists wherever
     /// there is a sidebar, so a host refusing this has not implemented the command rather than lacking the
     /// thing it moves.
